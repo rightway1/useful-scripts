@@ -1,0 +1,72 @@
+
+## *************************** Loading to Postgres examples **************************************
+## *** Shapefile to postgres declaring as British National Grid EPSG:27700
+ogr2ogr -f PostgreSQL -lco PRECISION=No -lco GEOMETRY_NAME=geometry -a_srs EPSG:27700 PG:"dbname=mydb host=localhost port=5432 user=username password=pwd" myshapefile.shp
+# If dataset contains mix of single and multi-geometries:
+# 1)  -nlt MULTIPOLYGON  if dataset contains polygons and multipolygons to force dataset to multipolygon
+# 2)  -nlt PROMOTE_TO_MULTI to promote any geometry type to its multi equivalent
+# 2)  -explodecollections  to force multi types into their single equivalent
+
+## *** Personal Geodatabase to postgres
+# Basic Version, specifying geometry column name
+ogr2ogr -f PostgreSQL -lco PRECISION=No -lco GEOMETRY_NAME=Geometry -a_srs EPSG:27700 PG:"dbname=mydb host=localhost port=5432 user=username password=pwd" "mypgdb.mdb" myfeatureclass
+# More advanced version, loading into specific schema and replacing any existing table with the same name 
+ogr2ogr -f PostgreSQL -overwrite -lco PRECISION=No -lco GEOMETRY_NAME=shape -lco SCHEMA=myschema -a_srs EPSG:27700 PG:"dbname=mydb host=localhost port=5432 user=username password=pwd" "mypgdb.mdb" myfeatureclass
+
+## *** ITN Path network to postgres from GML
+ogr2ogr -f PostgreSQL -overwrite -lco PRECISION=No -lco GEOMETRY_NAME=shape -a_srs EPSG:27700 PG:"dbname=mydb host=localhost port=5432 user=username password=pwd" "999999-NT0035.gml" PathLink ConnectingLink PathNode ConnectingNode
+
+## *** Oracle to Postgis. To convert multiple layers at once comma-separate layers at end of command
+ogr2ogr -f "PostgreSQL" -overwrite -a_srs EPSG:27700 -lco PRECISION=No -lco GEOMETRY_NAME=shape -lco SCHEMA=myschema -nln tablename PG:"dbname='mypgdb' user='username' password='pwd' host='localhost' port='5432'" OCI:username/pwd@connectionname:TABLE1,TABLE2,TABLE3
+
+## *************************** DXF example ********************************************************
+## *** DXF to DXF filtering out certain feature codes (This example panorama)
+ogr2ogr -f DXF output.dxf -where "LAYER='G8040201' OR LAYER='G8040202' OR LAYER='G8040203' OR LAYER='G8040205' OR LAYER='G8040207'" ns62.dxf
+
+
+## ********************* Postgres Export examples using clipping **************************************
+
+## *** Clip data using a bounding box- postgis -> shapefile - Needs a version of GDAL built with GEOS support
+ogr2ogr -f "ESRI Shapefile" -a_srs EPSG:27700 -nlt LINESTRING  -clipsrc 281778 687177 303500 705000 output_shapefile.shp PG:"dbname=mydb host=hostname port=5432 user=username password=pwd" "schemaname.tablename"
+
+## *** Using sql spatial query to specify features - postgis -> shapefile
+ogr2ogr -f "ESRI Shapefile" -a_srs EPSG:27700 -nlt LINESTRING output_shapefile.shp PG:"dbname=mydb host=hostname port=5432 user=username password=pwd" -sql "SELECT * from schemaname.tablename where st_intersects(geometry,geomfromtext('POLYGON((281778 687177,281778 705000,303500 705000,303500 687177,281778 687177))',27700))"
+# Another variation on SQL selection, output specific fields
+ogr2ogr -f "ESRI Shapefile" -a_srs EPSG:27700 output_shapefile.shp PG:"dbname=mydb host=hostname port=5432 user=username password=pwd" -sql "SELECT polyline,primary_key,fid,featurecode,descriptiveterm,descriptivegroup,theme,make,osmmstyle_name from schemaname.topographiclinemain where st_intersects(polyline,geomfromtext('POLYGON((303096 641458,303096 686212,346945 686212,346945 641458,303096 641458))',27700)) and descriptivegroup <> 'Building'"
+
+## *** As above but saving to Oracle
+ogr2ogr -f "OCI" -a_srs EPSG:27700 -nlt LINESTRING -nln putput_tablename OCI:user/pwd@connectionname PG:"dbname=mydb host=hostname port=5432 user=username password=pwd" -sql "SELECT * from schemaname.osm_roads where st_intersects(geometry,geomfromtext('POLYGON((281778 687177,281778 705000,303500 705000,303500 687177,281778 687177))',27700))"
+
+## *** Export features from one layer from Postgres to Shapefile, using another layer to clip - using Postgres SQL
+ogr2ogr -f "ESRI Shapefile" -a_srs EPSG:27700 -lco PRECISION=No output_shapefile.shp PG:"dbname='mydb' user='username' password='pwd' host='hostname' port='5432'"  -sql "select al2.* from osmmal2.osmm_addresslayer al2,schemaname.counties c where 1=1 AND st_intersects(al2.geometry,c.shape)"
+
+## *** Clip from Postgis to Postgis database - with GEOS support included***
+ogr2ogr -f "PostgreSQL" -clipsrc 277000 691000 282000 695000 -a_srs EPSG:27700 -lco PRECISION=No -lco GEOMETRY_NAME=Geometry PG:"dbname='outdb' user='out_username' password='out_pwd' host='out_host' port='5433'" PG:"dbname='indb' user='in_username' password='in_pwd' host='in_host' port='5432'" schemaname.tablename
+
+## *** Clip from Postgis to Postgis database - if no GEOS support***
+ogr2ogr -f "PostgreSQL" -a_srs EPSG:27700 -lco PRECISION=No PG:"dbname='outdb' user='out_username' password='out_pwd' host='out_host' port='5433'" PG:"dbname='indb' user='in_username' password='in_pwd' host='in_host' port='5432'" -sql "SELECT * from schemaname.tablename where st_intersects(geometry,geomfromtext('POLYGON((277000 691000,277000 695000,282000 695000,282000 691000,277000 691000))',27700))"
+
+##  *** Clip from Postgis to File Geodatabase.  Fast for large dataset.
+##      selects intersection with bounding box in db first for speed. 
+##      Then clips to shapefile locally ***
+ogr2ogr -f "FileGDB" output.gdb -a_srs EPSG:27700 -nlt POINT -nln output_featureclassname PG:"dbname='mydb' user='username' password='pwd' host='hostname' port='5432'" -sql "select * from schemaname.tablename where st_intersects(point, st_geomfromtext('POLYGON((500957 179257,500957 180564,502723 180564,502723 179257,500957 179257))',27700))" -clipsrc "clip_shapefile.shp"
+
+
+## *****************************PGDump Examples**********************************************
+
+## *** Clip Postgis table into a postgres backup file. Set the pg-use-copy parameter first to use faster copy command instead of insert commands***
+## This Geos version slow for large datasets as it needs to extract each record and check using Geos
+ogr2ogr -f "PGDump" output.sql -clipsrc 279761 691054 279881 691139 -a_srs EPSG:27700 -lco GEOMETRY_NAME=polyline PG:"dbname='mydb' user='username' password='pwd' host='hostname' port='5432'" schemaname.tablename
+
+## faster version using postgres spatial functionality.  Need to modify SQL with actual table name
+##  Could then precisely clip this to shapefile locally by adding a -clipsrc as well as shown in File Geodatabase example above
+ogr2ogr -f "PGDump" output.sql -a_srs EPSG:27700 -lco GEOMETRY_NAME=polyline -lco PRECISION=No PG:"dbname='mydb' user='username' password='pwd' host='hostname' port='5432'" -sql "SELECT * from schemaname.tablename where st_intersects(polyline,geomfromtext('POLYGON((279761 691054,279761 691139,279881 691139,279881 691054,279761 691054))',27700))"
+
+## even faster version using COPY statement and specifying schema
+ogr2ogr --config PG_USE_COPY YES -f "PGDump" output.sql -a_srs EPSG:27700 -lco GEOMETRY_NAME=polyline -lco PRECISION=No -lco SCHEMA=schemaname PG:"dbname='mydb' user='username' password='pwd' host='hostname' port='5432'" -sql "SELECT * from schemaname.tablename where st_intersects(polyline,geomfromtext('POLYGON((279761 691054,279761 691139,279881 691139,279881 691054,279761 691054))',27700))"
+
+
+*****************************Configuration Parameters *************************************
+## ?Problems loading because of special characters?  type following into command line before running ogr2ogr command:
+set pgclientencoding=LATIN1
+
