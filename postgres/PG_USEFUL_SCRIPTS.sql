@@ -36,8 +36,12 @@ select count(*) from pg_stat_activity;
 SELECT pg_size_pretty(pg_database_size('scotgovosmm')) As fulldbsize;
 
 
--- Ensure all tables and indexes in correct tablespace
+-- Identify tables and indexes in wrong tablespace for schema
+select schemaname, tablename, tablespace from pg_tables where schemaname like 'my_schema%' and tablespace <> 'my_tablespace';
+select schemaname, indexname, tablespace from pg_indexes where schemaname like 'my_schema%' and tablespace <> 'my_tablespace';
+-- Generate commands to move tables and indexes into correct tablespace for schema
 select 'alter table ' || schemaname || '.'  || tablename || ' set tablespace my_tablespace;' from pg_tables where schemaname like 'my_schema%' and tablespace = 'old_tablespace';
+select 'alter index ' || schemaname || '.' || indexname || ' set tablespace my_tablespace;' from pg_indexes where schemaname like 'my_schema%' and tablespace = 'old_tablespace';
 
 
 -- update the contents of one table to match the contents of another, using a spatial join (point in polygon)
