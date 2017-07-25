@@ -53,3 +53,23 @@ FROM pg_stat_user_indexes as userdex
     JOIN pg_indexes ON userdex.schemaname = pg_indexes.schemaname
         AND userdex.indexrelname = pg_indexes.indexname
 ORDER BY userdex.schemaname, userdex.relname, cols, userdex.indexrelname;
+
+--------------------------------
+-- Identify tables without primary keys.  
+-- Primary keys are often required for editing, linking to other tables, and replication
+---------------------------------
+SELECT
+    n.nspname AS "Schema",
+    c.relname AS "Table Name"
+FROM
+    pg_catalog.pg_class c
+JOIN
+    pg_namespace n
+ON (
+        c.relnamespace = n.oid
+    AND n.nspname NOT IN ('information_schema', 'pg_catalog')
+    AND c.relkind='r'
+)
+where c.relhaspkey = False
+ORDER BY n.nspname, c.relname
+;
