@@ -73,3 +73,21 @@ ON (
 where c.relhaspkey = False
 ORDER BY n.nspname, c.relname
 ;
+
+
+--------------------------------
+-- Identify ratio between index and table sizes
+-- May indicate index bloat if the ratio is high
+--------------------------------
+SELECT nspname, relname,
+	round(100 * pg_relation_size(indexrelid) / pg_relation_size(indrelid)) / 100 as index_ratio,
+	pg_size_pretty(pg_relation_size(indexrelid)) as index_size,
+	pg_size_pretty(pg_relation_size(indrelid)) as table_size
+FROM pg_index I
+	left join pg_class C on (C.oid = I.indexrelid)
+	left join pg_namespace N on (N.oid = C.relnamespace)
+WHERE 
+	nspname not in ('pg_catalog', 'information_schema','pg_toast') 
+	AND C.relkind='i' 
+	AND pg_relation_size(indrelid) > 0
+ORDER BY nspname, relname;
