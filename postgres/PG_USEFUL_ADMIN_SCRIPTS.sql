@@ -35,6 +35,20 @@ select count(*) from pg_stat_activity;
 -- Size of database
 SELECT pg_size_pretty(pg_database_size('scotgovosmm')) As fulldbsize;
 
+-- Size of tablespaces, excluding specific tablespaces
+SELECT spcname, pg_size_pretty(pg_tablespace_size(spcname)) 
+    FROM pg_tablespace
+    WHERE spcname not like 'pg_%'
+    ORDER BY spcname;
+
+-- Size of Biggest x tables in a schema
+SELECT
+    relname as "Table",
+    pg_size_pretty(pg_total_relation_size(relid)) As "Size",
+    FROM pg_catalog.pg_statio_user_tables
+    WHERE schemaname = 'myschema'
+    ORDER BY pg_total_relation_size(relid) DESC
+    LIMIT 10;
 
 -- Identify tables and indexes in wrong tablespace for schema
 select schemaname, tablename, tablespace from pg_tables where schemaname like 'my_schema%' and tablespace <> 'my_tablespace';

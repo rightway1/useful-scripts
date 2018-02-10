@@ -78,6 +78,7 @@ ORDER BY n.nspname, c.relname
 --------------------------------
 -- Identify ratio between index and table sizes
 -- May indicate index bloat if the ratio is high
+--  Change in ratio is more indicative than actual value
 --------------------------------
 SELECT nspname, relname,
 	round(100 * pg_relation_size(indexrelid) / pg_relation_size(indrelid)) / 100 as index_ratio,
