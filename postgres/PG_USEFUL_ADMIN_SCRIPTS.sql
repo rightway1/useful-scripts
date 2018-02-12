@@ -26,10 +26,25 @@ ALTER TABLE my_schema.my_table ALTER COLUMN shape SET DATA TYPE geometry(MultiPo
 ALTER TABLE my_schema.my_table ALTER COLUMN shape SET DATA TYPE geometry(Point,27700) USING st_geometryN(shape,1);
 
 
+-- Identify tables and indexes in wrong tablespace for schema
+select schemaname, tablename, tablespace from pg_tables where schemaname like 'my_schema%' and tablespace <> 'my_tablespace';
+select schemaname, indexname, tablespace from pg_indexes where schemaname like 'my_schema%' and tablespace <> 'my_tablespace';
+-- Generate commands to move tables and indexes into correct tablespace for schema
+select 'alter table ' || schemaname || '.'  || tablename || ' set tablespace my_tablespace;' from pg_tables where schemaname like 'my_schema%' and tablespace = 'old_tablespace';
+select 'alter index ' || schemaname || '.' || indexname || ' set tablespace my_tablespace;' from pg_indexes where schemaname like 'my_schema%' and tablespace = 'old_tablespace';
+
+
+------------------------------------------------------
+-- Get info about database
+------------------------------------------------------
+
 -- Count the number of connections to the database
 SELECT sum(numbackends) FROM pg_stat_database;
 --or
-select count(*) from pg_stat_activity;
+SELECT count(*) FROM pg_stat_activity;
+
+-- Get max connections for a database
+SELECT * from pg_settings WHERE name = 'max_connections';
 
 
 -- Size of database
@@ -50,22 +65,3 @@ SELECT
     ORDER BY pg_total_relation_size(relid) DESC
     LIMIT 10;
 
--- Identify tables and indexes in wrong tablespace for schema
-select schemaname, tablename, tablespace from pg_tables where schemaname like 'my_schema%' and tablespace <> 'my_tablespace';
-select schemaname, indexname, tablespace from pg_indexes where schemaname like 'my_schema%' and tablespace <> 'my_tablespace';
--- Generate commands to move tables and indexes into correct tablespace for schema
-select 'alter table ' || schemaname || '.'  || tablename || ' set tablespace my_tablespace;' from pg_tables where schemaname like 'my_schema%' and tablespace = 'old_tablespace';
-select 'alter index ' || schemaname || '.' || indexname || ' set tablespace my_tablespace;' from pg_indexes where schemaname like 'my_schema%' and tablespace = 'old_tablespace';
-
-
--- update the contents of one table to match the contents of another, using a spatial join (point in polygon)
-update streets s set countyname = c.countyname from counties c where st_intersects(c.shape, s.shape);
-
-
--- Update values in one table with multiple values from another table
-Update table1 t1 set
-	newfield1 = t2.oldfield1,
-	newfield2 = td2.oldfield2
-	from table2 t2
-	where t2.id = t1.id;
-	
