@@ -1,0 +1,7 @@
+version: '2'
+services:
+  {{ cookiecutter.project_name }}:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    network_mode: host

@@ -1,0 +1,11 @@
+FROM hub.docker.com/python36:latest
+
+WORKDIR /usr/src/app
+
+ENV FLASK_APP autoapp.py
+ENV CRYPTO_KEY xxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
+ENV LC_ALL=en_US.utf-8
+ENV LANG=en_US.utf-8
+COPY . .
+RUN pip3 install --no-cache-dir -r requirements.txt
+CMD [ "flask", "run" ]

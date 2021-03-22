@@ -1,0 +1,50 @@
+{
+    "portMappings": [
+        {
+          "internal": 5000,
+          "external": {{cookiecutter.external_port}}
+        }
+    ],
+    "envPath": "ci/config/",
+    "envFile": "docker.env",
+    "imageName": "{{cookiecutter.project_name}}",
+    "containerName": "{{cookiecutter.project_name}}",
+    "containerRegistry": "myrepo",
+    "containerRegistryCredentials": "saved_secret_creds",
+    "containerEnvironmentTag": "dev",
+    "targetBuckets": [
+        {
+            "bucket": "prodev-docker-bucket"
+        },
+        {
+            "bucket": "prodev-docker-bucket-2"
+        }
+    ],
+    "appURLs": [
+    ],
+    "postStartupTasks": [
+    ],
+    "dockerOptions": [
+        {
+            "option": "--hostname `hostname -s`"
+        },
+        {
+            "option": "--restart=always"
+        },
+        {
+            "option": "--log-driver=fluentd"
+        },
+        {
+            "option": "--log-opt tag={{cookiecutter.project_name}}.dev.python.json"
+        }
+    ],
+    "encryptedEnvVars": [
+        {
+            "credentialsId": "crypto-key-dev",
+            "usernameVariable": "key",
+            "passwordVariable": "value"
+        }
+    ],
+    "integrationTests": [
+    ]
+}

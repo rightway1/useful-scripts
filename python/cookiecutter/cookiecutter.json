@@ -1,0 +1,16 @@
+
+{
+  "resource_name": "SomeEntity",
+  "package_name": "{{ cookiecutter.resource_name|lower }}",
+  "project_name": "{{ cookiecutter.package_name }}-api",
+  "external_port": 5000,
+  "_copy_without_render": [
+        "*ci/container",
+        "*img",
+        ".flake8",
+        ".gitignore",
+        "autoapp.py",
+        "requirements.txt",
+        "SUPPORT.md"
+    ]
+}
