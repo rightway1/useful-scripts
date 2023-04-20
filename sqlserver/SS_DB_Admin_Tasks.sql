@@ -1,3 +1,9 @@
+-- Bring a database online from a tSQL query window.  (Need to open the master key first for an encrypted DB)
+ALTER DATABASE <myDatabase> SET ONLINE;
+
+-- Restore a database from backup from tSQL query 
+RESTORE DATABASE <myDatabase> FROM DISK = 'C:\temp\MyDbBackup.bak'
+
 -- If restoring a database, the database users might not be linked to logins in the database instance
 
 -- Associate instance login with database user (2008+)
