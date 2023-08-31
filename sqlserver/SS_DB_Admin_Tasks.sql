@@ -62,3 +62,27 @@ GROUP BY
     i.name
 ORDER BY
 	'Indexsize(KB)' DESC
+
+
+-- Get row count for all tables in database, or specific schemas
+SELECT 
+	t.NAME AS TableName,
+	s.name AS SchemaName,
+	p.[Rows] AS rowcount
+FROM 
+	sys.tables t
+	JOIN sys.indexes i ON t.OBJECT_ID = i.object_id
+	JOIN sys.partitions p ON i.object_id = p.OBJECT_ID AND i.index_id = p.index_id
+	JOIN sys.schemas s on s.schema_id = t.schema_id
+WHERE 
+	t.NAME NOT LIKE 'dt%' AND
+	i.OBJECT_ID > 255 AND   
+	i.index_id <= 1 
+	/* 
+	AND
+	s.name in ('Schemaname1','Schemaname2') 
+	--*/
+GROUP BY 
+	t.NAME, i.object_id, i.index_id, i.name,s.name, p.[Rows]
+ORDER BY 
+	object_name(i.object_id) 
