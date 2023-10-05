@@ -68,7 +68,7 @@ ORDER BY
 SELECT 
 	t.NAME AS TableName,
 	s.name AS SchemaName,
-	p.[Rows] AS rowcount
+	p.[Rows] AS numRows
 FROM 
 	sys.tables t
 	JOIN sys.indexes i ON t.OBJECT_ID = i.object_id
