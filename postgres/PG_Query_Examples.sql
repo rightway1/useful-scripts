@@ -11,4 +11,12 @@ UPDATE table1 t1 SET
 	newfield2 = td2.oldfield2
 	FROM table2 t2
 	WHERE t2.id = t1.id;
-	
+
+
+-- Get a list of tables and views with their comments
+SELECT table_catalog, table_schema, table_name, table_type,
+    obj_description((table_schema||'.'||quote_ident(table_name))::regclass)
+FROM information_schema.tables 
+WHERE table_schema not in ('pg_catalog', 'information_schema', 'public')
+-- and table_type = 'BASE TABLE'
+ORDER BY table_schema, table_name;
