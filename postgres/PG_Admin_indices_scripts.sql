@@ -54,6 +54,120 @@ FROM pg_stat_user_indexes as userdex
         AND userdex.indexrelname = pg_indexes.indexname
 ORDER BY userdex.schemaname, userdex.relname, cols, userdex.indexrelname;
 
+--- Alternative query for duplicates - from 
+SELECT ni.nspname || '.' || ct.relname AS "table", 
+       ci.relname AS "dup index",
+       pg_get_indexdef(i.indexrelid) AS "dup index definition", 
+       i.indkey AS "dup index attributes",
+       cii.relname AS "encompassing index", 
+       pg_get_indexdef(ii.indexrelid) AS "encompassing index definition",
+       ii.indkey AS "enc index attributes"
+  FROM pg_index i
+  JOIN pg_class ct ON i.indrelid=ct.oid
+  JOIN pg_class ci ON i.indexrelid=ci.oid
+  JOIN pg_namespace ni ON ci.relnamespace=ni.oid
+  JOIN pg_index ii ON ii.indrelid=i.indrelid AND
+                      ii.indexrelid != i.indexrelid AND
+                      (array_to_string(ii.indkey, ' ') || ' ') like (array_to_string(i.indkey, ' ') || ' %') AND
+                      (array_to_string(ii.indcollation, ' ')  || ' ') like (array_to_string(i.indcollation, ' ') || ' %') AND
+                      (array_to_string(ii.indclass, ' ')  || ' ') like (array_to_string(i.indclass, ' ') || ' %') AND
+                      (array_to_string(ii.indoption, ' ')  || ' ') like (array_to_string(i.indoption, ' ') || ' %') AND
+                      NOT (ii.indkey::integer[] @> ARRAY[0]) AND -- Remove if you want expression indexes (you probably don't)
+                      NOT (i.indkey::integer[] @> ARRAY[0]) AND -- Remove if you want expression indexes (you probably don't)
+                      i.indpred IS NULL AND -- Remove if you want indexes with predicates
+                      ii.indpred IS NULL AND -- Remove if you want indexes with predicates
+                      CASE WHEN i.indisunique THEN ii.indisunique AND
+                         array_to_string(ii.indkey, ' ') = array_to_string(i.indkey, ' ') ELSE true END
+  JOIN pg_class ctii ON ii.indrelid=ctii.oid
+  JOIN pg_class cii ON ii.indexrelid=cii.oid
+ WHERE ct.relname NOT LIKE 'pg_%' AND
+       NOT i.indisprimary
+ ORDER BY 1, 2, 3
+       ;
+
+--------------------------------
+-- Identify rarely used indexes.
+-- From github.com/pgexperts/pgx_scripts
+--------------------------------
+WITH table_scans as (
+    SELECT relid,
+        tables.idx_scan + tables.seq_scan as all_scans,
+        ( tables.n_tup_ins + tables.n_tup_upd + tables.n_tup_del ) as writes,
+                pg_relation_size(relid) as table_size
+        FROM pg_stat_user_tables as tables
+),
+all_writes as (
+    SELECT sum(writes) as total_writes
+    FROM table_scans
+),
+indexes as (
+    SELECT idx_stat.relid, idx_stat.indexrelid,
+        idx_stat.schemaname, idx_stat.relname as tablename,
+        idx_stat.indexrelname as indexname,
+        idx_stat.idx_scan,
+        pg_relation_size(idx_stat.indexrelid) as index_bytes,
+        indexdef ~* 'USING btree' AS idx_is_btree
+    FROM pg_stat_user_indexes as idx_stat
+        JOIN pg_index
+            USING (indexrelid)
+        JOIN pg_indexes as indexes
+            ON idx_stat.schemaname = indexes.schemaname
+                AND idx_stat.relname = indexes.tablename
+                AND idx_stat.indexrelname = indexes.indexname
+    WHERE pg_index.indisunique = FALSE
+),
+index_ratios AS (
+SELECT schemaname, tablename, indexname,
+    idx_scan, all_scans,
+    round(( CASE WHEN all_scans = 0 THEN 0.0::NUMERIC
+        ELSE idx_scan::NUMERIC/all_scans * 100 END),2) as index_scan_pct,
+    writes,
+    round((CASE WHEN writes = 0 THEN idx_scan::NUMERIC ELSE idx_scan::NUMERIC/writes END),2)
+        as scans_per_write,
+    pg_size_pretty(index_bytes) as index_size,
+    pg_size_pretty(table_size) as table_size,
+    idx_is_btree, index_bytes
+    FROM indexes
+    JOIN table_scans
+    USING (relid)
+),
+index_groups AS (
+SELECT 'Never Used Indexes' as reason, *, 1 as grp
+FROM index_ratios
+WHERE
+    idx_scan = 0
+    and idx_is_btree
+UNION ALL
+SELECT 'Low Scans, High Writes' as reason, *, 2 as grp
+FROM index_ratios
+WHERE
+    scans_per_write <= 1
+    and index_scan_pct < 10
+    and idx_scan > 0
+    and writes > 100
+    and idx_is_btree
+UNION ALL
+SELECT 'Seldom Used Large Indexes' as reason, *, 3 as grp
+FROM index_ratios
+WHERE
+    index_scan_pct < 5
+    and scans_per_write > 1
+    and idx_scan > 0
+    and idx_is_btree
+    and index_bytes > 100000000
+UNION ALL
+SELECT 'High-Write Large Non-Btree' as reason, index_ratios.*, 4 as grp 
+FROM index_ratios, all_writes
+WHERE
+    ( writes::NUMERIC / ( total_writes + 1 ) ) > 0.02
+    AND NOT idx_is_btree
+    AND index_bytes > 100000000
+ORDER BY grp, index_bytes DESC )
+SELECT reason, schemaname, tablename, indexname,
+    index_scan_pct, scans_per_write, index_size, table_size
+FROM index_groups;
+
+
 --------------------------------
 -- Identify tables without primary keys.  
 -- Primary keys are often required for editing, linking to other tables, and replication
