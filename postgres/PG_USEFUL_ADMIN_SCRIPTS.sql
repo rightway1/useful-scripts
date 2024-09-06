@@ -59,9 +59,16 @@ SELECT spcname, pg_size_pretty(pg_tablespace_size(spcname))
 -- Size of Biggest x tables in a schema
 SELECT
     relname as "Table",
-    pg_size_pretty(pg_total_relation_size(relid)) As "Size",
+    pg_size_pretty(pg_total_relation_size(relid)) As "Size"
     FROM pg_catalog.pg_statio_user_tables
     WHERE schemaname = 'myschema'
     ORDER BY pg_total_relation_size(relid) DESC
     LIMIT 10;
+
+-- Total table size by schema
+SELECT
+	schemaname,
+    pg_size_pretty(sum(pg_total_relation_size(relid))) As "Size"
+    FROM pg_catalog.pg_statio_user_tables
+    group by schemaname;
 
