@@ -173,21 +173,23 @@ FROM index_groups;
 -- Primary keys are often required for editing, linking to other tables, and replication
 ---------------------------------
 SELECT
-    n.nspname AS "Schema",
-    c.relname AS "Table Name"
-FROM
-    pg_catalog.pg_class c
-JOIN
-    pg_namespace n
-ON (
-        c.relnamespace = n.oid
-    AND n.nspname NOT IN ('information_schema', 'pg_catalog')
-    AND c.relkind='r'
-)
-where c.relhaspkey = False
-ORDER BY n.nspname, c.relname
-;
-
+	t.table_catalog, 
+	t.table_schema, 
+	t.table_name
+FROM information_schema.tables t 
+WHERE
+	t.table_schema not in ('information_schema','pg_catalog')
+	and t.table_type = 'BASE TABLE'
+	and not exists (
+		SELECT 1 
+		FROM information_schema.table_constraints tc
+		WHERE tc.table_catalog = t.table_catalog
+			and tc.table_schema = t.table_schema
+			and tc.table_name = t.table_name
+			and tc.constraint_type = 'PRIMARY KEY'
+	)
+ORDER BY table_schema, table_name;
+		
 
 --------------------------------
 -- Identify ratio between index and table sizes
@@ -206,3 +208,4 @@ WHERE
 	AND C.relkind='i' 
 	AND pg_relation_size(indrelid) > 0
 ORDER BY nspname, relname;
+
