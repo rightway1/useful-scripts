@@ -72,3 +72,23 @@ SELECT
     FROM pg_catalog.pg_statio_user_tables
     group by schemaname;
 
+-- List of all Tables, Views and MViews in DB with size and comment where applicable
+SELECT
+    n.nspname AS schema_name,
+    c.relname AS object_name,
+    CASE c.relkind
+        WHEN 'r' THEN 'Table'
+        WHEN 'm' THEN 'M View'
+        WHEN 'v' THEN 'View'
+    END AS object_type,
+    pg_size_pretty(pg_total_relation_size(c.oid)) as size,
+    pg_catalog.obj_description(c.oid, 'pg_class') AS comment
+FROM
+    pg_catalog.pg_class c
+JOIN
+    pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE
+    c.relkind IN ('r', 'm', 'v')  -- 'r' = table, 'm' = materialized view, 'v' = view
+    AND n.nspname NOT IN ('pg_catalog', 'information_schema')  -- exclude system schemas
+ORDER BY
+    schema_name, object_name;
